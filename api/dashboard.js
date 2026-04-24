@@ -9,6 +9,7 @@ import {
   setCacheHeaders,
   toErrorResponse
 } from "./_lib/http.js";
+
 import {
   fetchCollection,
   getApiBaseUrl,
@@ -17,36 +18,180 @@ import {
   sumTrackTotals
 } from "./_lib/soundcloud.js";
 
-const DEFAULT_USER_URL = process.env.SOUNDCLOUD_USER_URL?.trim() || "https://soundcloud.com/ploxiii";
-const INCLUDE_MANUAL_ADJUSTMENTS = process.env.DASHBOARD_INCLUDE_MANUAL_ADJUSTMENTS !== "false";
+const DEFAULT_USER_URL =
+  process.env.SOUNDCLOUD_USER_URL?.trim() ||
+  "https://soundcloud.com/ploxiii";
 
-// --- STATYSTYKI HISTORYCZNE (DO 2025 ROKU) ---
-// Te dane są stałe, bo rok 2022-2025 już minął.
-const HISTORICAL_DATA = [
-  { label: "2022", total: 1200 }, // Wpisz tu realną sumę na koniec 2022
-  { label: "2023", total: 3500 }, // Wpisz tu realną sumę na koniec 2023
-  { label: "2024", total: 8035 }, // Wpisz tu realną sumę na koniec 2024
-  { label: "2025", total: 15880 } // Suma na koniec 2025
+const INCLUDE_MANUAL_ADJUSTMENTS =
+  process.env.DASHBOARD_INCLUDE_MANUAL_ADJUSTMENTS !== "false";
+
+const YEARLY_TOTALS = [
+  { label: "2024", total: 4535 },
+  { label: "2025", total: 15880 },
+  { label: "2026", total: 23208 }
 ];
 
-/**
- * Funkcja generująca historię roczną, w tym dynamiczny rok 2026
- */
-function generateYearlyHistory(liveTotal) {
-  const currentYear = new Date().getFullYear().toString();
-  const history = [...HISTORICAL_DATA];
-  
-  // Obliczamy ile odtworzeń przybyło w 2026 (Live Total - Suma z 2025)
-  const lastYearTotal = HISTORICAL_DATA[HISTORICAL_DATA.length - 1].total;
-  const currentYearPlays = Math.max(liveTotal - lastYearTotal, 0);
+function cumulativeToGrowth(items) {
+  return items.map((item, index) => {
+    if (index === 0) {
+      return { label: item.label, plays: item.total };
+    }
 
-  // Dodajemy bieżący rok (2026) do wykresu
-  history.push({ label: currentYear, total: liveTotal });
+    const previousTotal = items[index - 1].total;
+    const diff = item.total - previousTotal;
 
-  // Przeliczamy na "przyrosty" (żeby wykres pokazywał ile w danym roku, a nie sumę)
-  return history.map((item, index) => {
-    if (index === 0) return { label: item.label, plays: item.total };
-    const prevTotal = history[index - 1].total;
     return {
       label: item.label,
-      plays: Math.max(
+      plays: diff <= 0 ? item.total : diff
+    };
+  });
+}
+
+const MANUAL_ADJUSTMENTS = {
+  totals: {
+    playback_count: 0,
+    likes: 0,
+    comments: 0,
+    reposts: 0,
+    downloads: 0
+  },
+  history: {
+    yearly: cumulativeToGrowth(YEARLY_TOTALS),
+    monthly: [
+      { label: "Jan", plays: 1668 },
+      { label: "Feb", plays: 1758 },
+      { label: "Mar", plays: 1475 },
+      { label: "Apr", plays: 2251 },
+      { label: "May", plays: 1293 },
+      { label: "Jun", plays: 1390 },
+      { label: "Jul", plays: 3132 },
+      { label: "Aug", plays: 2185 },
+      { label: "Sep", plays: 1889 },
+      { label: "Oct", plays: 1880 },
+      { label: "Nov", plays: 1766 },
+      { label: "Dec", plays: 1667 }
+    ],
+    daily: Array.from({ length: 14 }, (_, index) => ({
+      label: String(index + 1),
+      plays: 2000 + index * 180
+    }))
+  }
+};
+
+function addTotals(liveTotals, manualTotals) {
+  return {
+    playback_count:
+      (liveTotals.playback_count || 0) + manualTotals.playback_count,
+    likes: (liveTotals.likes || 0) + manualTotals.likes,
+    comments: (liveTotals.comments || 0) + manualTotals.comments,
+    reposts: (liveTotals.reposts || 0) + manualTotals.reposts,
+    downloads: (liveTotals.downloads || 0) + manualTotals.downloads
+  };
+}
+
+export default async function handler(req, res) {
+  applyCors(req, res);
+
+  const preflightResult = handlePreflight(req, res);
+  if (preflightResult) return preflightResult;
+
+  if (!enforceMethod(req, res, ["GET"])) return null;
+
+  try {
+    const requestedUrl = getQueryValue(
+      req,
+      "url",
+      "user_url",
+      "userUrl"
+    );
+
+    const userUrl = resolveSoundCloudUrl(
+      requestedUrl,
+      DEFAULT_USER_URL
+    );
+
+    const { data: user, authMode } = await resolveResource(userUrl, {
+      expectedKinds: ["user"]
+    });
+
+    const userId = user?.id;
+
+    if (!userId) {
+      throw new Error(
+        "SoundCloud resolve response did not contain a user id"
+      );
+    }
+
+    const collectionPath = `users/${encodeURIComponent(
+      String(userId)
+    )}/tracks`;
+
+    const {
+      items,
+      authMode: collectionAuthMode
+    } = await fetchCollection(collectionPath);
+
+    const normalizedTracks = items
+      .map(normalizeTrack)
+      .sort(
+        (a, b) =>
+          (b.playback_count || 0) - (a.playback_count || 0)
+      );
+
+    const liveTotals = sumTrackTotals(normalizedTracks);
+
+    const manualTotals = INCLUDE_MANUAL_ADJUSTMENTS
+      ? MANUAL_ADJUSTMENTS.totals
+      : {
+          playback_count: 0,
+          likes: 0,
+          comments: 0,
+          reposts: 0,
+          downloads: 0
+        };
+
+    const finalTotals = addTotals(liveTotals, manualTotals);
+
+    setCacheHeaders(res, {
+      browserMaxAge: 0,
+      sMaxAge: 300,
+      staleWhileRevalidate: 86400
+    });
+
+    return sendJson(res, 200, {
+      artist: user?.username || "ploxiii",
+      trackCount: normalizedTracks.length,
+      sinceYear: 2026,
+      trackTitle: `${user?.username || "ploxiii"} — All Tracks`,
+      playback_count: finalTotals.playback_count,
+      likes: finalTotals.likes,
+      comments: finalTotals.comments,
+      reposts: finalTotals.reposts,
+      downloads: finalTotals.downloads,
+      history: INCLUDE_MANUAL_ADJUSTMENTS
+        ? MANUAL_ADJUSTMENTS.history
+        : { yearly: [], monthly: [], daily: [] },
+      tracks: normalizedTracks,
+      updatedAt: new Date().toISOString(),
+      meta: {
+        apiBaseUrl: getApiBaseUrl(),
+        requestedUserUrl: userUrl,
+        authMode: collectionAuthMode || authMode,
+        manualAdjustmentsApplied: INCLUDE_MANUAL_ADJUSTMENTS
+      }
+    });
+  } catch (error) {
+    logError("dashboard", error);
+
+    if (error?.code === "soundcloud_captcha_blocked") {
+      return sendJson(res, 503, {
+        error:
+          "SoundCloud temporarily blocked server access with captcha",
+        code: "soundcloud_captcha_blocked"
+      });
+    }
+
+    const { status, payload } = toErrorResponse(error);
+    return sendJson(res, status, payload);
+  }
+}
