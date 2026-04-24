@@ -15,17 +15,21 @@ import {
   normalizeTrack,
   resolveResource,
   sumTrackTotals
-} from "./_lib/soundcloud.js"; // Poprawiono ścieżkę z *lib na _lib
+} from "./_lib/soundcloud.js"; // Poprawiona ścieżka z *lib na _lib
 
+// Konfiguracja
 const DEFAULT_USER_URL = process.env.SOUNDCLOUD_USER_URL?.trim() || "https://soundcloud.com/ploxiii";
 const INCLUDE_MANUAL_ADJUSTMENTS = process.env.DASHBOARD_INCLUDE_MANUAL_ADJUSTMENTS !== "false";
 
-// Dane historyczne - jeśli chcesz, aby były dynamiczne, musiałbyś pobierać je z bazy danych.
-// SoundCloud API nie udostępnia łatwo historycznych danych "dzień po dniu" dla darmowych kont.
+/**
+ * UWAGA: SoundCloud API nie zwraca danych historycznych (per day/month).
+ * Te dane poniżej musisz edytować RĘCZNIE, aby wykresy na stronie się zmieniły,
+ * dopóki nie wdrożysz bazy danych (np. MongoDB/Firebase).
+ */
 const YEARLY_TOTALS = [
   { label: "2024", total: 4535 },
   { label: "2025", total: 15880 },
-  { label: "2026", total: 20036 } // Przykładowa aktualizacja
+  { label: "2026", total: 7328 } // Tutaj wpisz swój aktualny całkowity licznik
 ];
 
 function cumulativeToGrowth(items) {
@@ -40,14 +44,21 @@ function cumulativeToGrowth(items) {
 }
 
 const MANUAL_ADJUSTMENTS = {
-  totals: { playback_count: 0, likes: 0, comments: 0, reposts: 0, downloads: 0 },
+  totals: {
+    playback_count: 0, // Dodatkowe odtworzenia (spoza SoundCloud)
+    likes: 0,
+    comments: 0,
+    reposts: 0,
+    downloads: 0
+  },
   history: {
     yearly: cumulativeToGrowth(YEARLY_TOTALS),
     monthly: [
       { label: "Jan", plays: 1668 },
       { label: "Feb", plays: 1758 },
-      { label: "Mar", plays: 1475 }
-      // ... reszta miesięcy
+      { label: "Mar", plays: 1475 },
+      { label: "Apr", plays: 2251 }
+      // Uzupełnij resztę miesięcy tutaj
     ],
     daily: Array.from({ length: 14 }, (_, index) => ({
       label: String(index + 1),
@@ -58,11 +69,11 @@ const MANUAL_ADJUSTMENTS = {
 
 function addTotals(liveTotals, manualTotals) {
   return {
-    playback_count: (liveTotals.playback_count || 0) + manualTotals.playback_count,
-    likes: (liveTotals.likes || 0) + manualTotals.likes,
-    comments: (liveTotals.comments || 0) + manualTotals.comments,
-    reposts: (liveTotals.reposts || 0) + manualTotals.reposts,
-    downloads: (liveTotals.downloads || 0) + manualTotals.downloads
+    playback_count: (liveTotals.playback_count || 0) + (manualTotals.playback_count || 0),
+    likes: (liveTotals.likes || 0) + (manualTotals.likes || 0),
+    comments: (liveTotals.comments || 0) + (manualTotals.comments || 0),
+    reposts: (liveTotals.reposts || 0) + (manualTotals.reposts || 0),
+    downloads: (liveTotals.downloads || 0) + (manualTotals.downloads || 0)
   };
 }
 
@@ -77,7 +88,7 @@ export default async function handler(req, res) {
     const requestedUrl = getQueryValue(req, "url", "user_url", "userUrl");
     const userUrl = resolveSoundCloudUrl(requestedUrl, DEFAULT_USER_URL);
 
-    // 1. Pobieranie danych użytkownika
+    // 1. Pobierz dane profilu
     const { data: user, authMode } = await resolveResource(userUrl, { expectedKinds: ["user"] });
     const userId = user?.id;
 
@@ -85,27 +96,32 @@ export default async function handler(req, res) {
       throw new Error("SoundCloud resolve response did not contain a user id");
     }
 
-    // 2. Pobieranie utworów (używamy backticków dla template literals)
+    // 2. Pobierz listę utworów (Używamy ` zamiast ')
     const collectionPath = `users/${encodeURIComponent(String(userId))}/tracks`;
     const { items, authMode: collectionAuthMode } = await fetchCollection(collectionPath);
 
-    // 3. Normalizacja i sumowanie danych LIVE
+    // 3. Normalizacja i sortowanie utworów
     const normalizedTracks = items
       .map(normalizeTrack)
       .sort((left, right) => (right.playback_count || 0) - (left.playback_count || 0));
 
+    // 4. Sumowanie statystyk LIVE
     const liveTotals = sumTrackTotals(normalizedTracks);
     
-    // 4. Łączenie statystyk
-    const manualTotals = INCLUDE_MANUAL_ADJUSTMENTS ? MANUAL_ADJUSTMENTS.totals : { playback_count: 0, likes: 0, comments: 0, reposts: 0, downloads: 0 };
+    // 5. Połączenie danych Live z Manualnymi (jeśli włączone)
+    const manualTotals = INCLUDE_MANUAL_ADJUSTMENTS 
+      ? MANUAL_ADJUSTMENTS.totals 
+      : { playback_count: 0, likes: 0, comments: 0, reposts: 0, downloads: 0 };
+
     const finalTotals = addTotals(liveTotals, manualTotals);
 
     setCacheHeaders(res, {
       browserMaxAge: 0,
-      sMaxAge: 300, // Cache na 5 minut
+      sMaxAge: 300,
       staleWhileRevalidate: 86400
     });
 
+    // 6. Wysłanie odpowiedzi
     return sendJson(res, 200, {
       artist: user?.username || "AREKKUZZERA",
       trackCount: normalizedTracks.length,
@@ -116,7 +132,9 @@ export default async function handler(req, res) {
       comments: finalTotals.comments,
       reposts: finalTotals.reposts,
       downloads: finalTotals.downloads,
-      history: INCLUDE_MANUAL_ADJUSTMENTS ? MANUAL_ADJUSTMENTS.history : { yearly: [], monthly: [], daily: [] },
+      history: INCLUDE_MANUAL_ADJUSTMENTS 
+        ? MANUAL_ADJUSTMENTS.history 
+        : { yearly: [], monthly: [], daily: [] },
       tracks: normalizedTracks,
       updatedAt: new Date().toISOString(),
       meta: {
@@ -126,14 +144,17 @@ export default async function handler(req, res) {
         manualAdjustmentsApplied: INCLUDE_MANUAL_ADJUSTMENTS
       }
     });
+
   } catch (error) {
     logError("dashboard", error);
+    
     if (error?.code === "soundcloud_captcha_blocked") {
       return sendJson(res, 503, {
-        error: "SoundCloud temporarily blocked server access with captcha",
+        error: "SoundCloud blocked access (Captcha). Try again later.",
         code: "soundcloud_captcha_blocked"
       });
     }
+
     const { status, payload } = toErrorResponse(error);
     return sendJson(res, status, payload);
   }
