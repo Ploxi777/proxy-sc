@@ -25,6 +25,8 @@ const DEFAULT_USER_URL =
 const INCLUDE_MANUAL_ADJUSTMENTS =
   process.env.DASHBOARD_INCLUDE_MANUAL_ADJUSTMENTS !== "false";
 
+const SINCE_YEAR = 2025;
+
 const YEARLY_TOTALS = [
   { label: "2024", total: 4535 },
   { label: "2025", total: 15880 },
@@ -133,6 +135,10 @@ export default async function handler(req, res) {
 
     const normalizedTracks = items
       .map(normalizeTrack)
+      .filter(track => {
+        if (!track.created_at) return false;
+        return new Date(track.created_at).getFullYear() >= SINCE_YEAR;
+      })
       .sort(
         (a, b) =>
           (b.playback_count || 0) - (a.playback_count || 0)
@@ -161,7 +167,7 @@ export default async function handler(req, res) {
     return sendJson(res, 200, {
       artist: user?.username || "ploxiii",
       trackCount: normalizedTracks.length,
-      sinceYear: 2026,
+      sinceYear: SINCE_YEAR,
       trackTitle: `${user?.username || "ploxiii"} — All Tracks`,
       playback_count: finalTotals.playback_count,
       likes: finalTotals.likes,
