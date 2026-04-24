@@ -26,9 +26,9 @@ const INCLUDE_MANUAL_ADJUSTMENTS =
 const SINCE_YEAR = 2025;
 
 const YEARLY_TOTALS = [
-  { label: "2024", total: 4535 },
-  { label: "2025", total: 15880 },
-  { label: "2026", total: 23208 }
+  { label: "2024", total: 12000 },
+  { label: "2025", total: 18500 },
+  { label: "2026", total: 26000 }
 ];
 
 function cumulativeToGrowth(items) {
