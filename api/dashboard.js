@@ -5,8 +5,8 @@ import {
   handlePreflight,
   logError,
   resolveSoundCloudUrl,
-  sendJson,
-  setCacheHeaders,
+    sendJson,
+    setCacheHeaders,
   toErrorResponse
 } from "./_lib/http.js";
 import {
@@ -109,7 +109,7 @@ export default async function handler(req, res) {
     return sendJson(res, 200, {
       artist: user?.username || "ploxiii", // Zmienione na Twoją prośbę
       trackCount: normalizedTracks.length,
-      sinceYear: 2016,
+      sinceYear: 2026,
       trackTitle: `${user?.username || "ploxiii"} — All Tracks`, // Poprawione formatowanie
       playback_count: finalTotals.playback_count,
       likes: finalTotals.likes,
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
       reposts: finalTotals.reposts,
       downloads: finalTotals.downloads,
       history: INCLUDE_MANUAL_ADJUSTMENTS ? MANUAL_ADJUSTMENTS.history : { yearly: [], monthly: [], daily: [] },
-      tracks: normalizedTracks,
+      tracks: normalizedTracks,  
       updatedAt: new Date().toISOString(),
       meta: {
         apiBaseUrl: getApiBaseUrl(),
