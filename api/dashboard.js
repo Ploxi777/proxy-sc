@@ -59,18 +59,18 @@ const MANUAL_ADJUSTMENTS = {
   history: {
     yearly: cumulativeToGrowth(YEARLY_TOTALS),
     monthly: [
-      { label: "Jan", plays: 12000 },
-      { label: "Feb", plays: 17000 },
-      { label: "Mar", plays: 22000 },
-      { label: "Apr", plays: 28000 },
-      { label: "May", plays: 31000 },
-      { label: "Jun", plays: 26000 },
-      { label: "Jul", plays: 34000 },
-      { label: "Aug", plays: 41000 },
-      { label: "Sep", plays: 52000 },
-      { label: "Oct", plays: 68000 },
-      { label: "Nov", plays: 74000 },
-      { label: "Dec", plays: 91000 }
+      { label: "Jan", plays: 1668 },
+      { label: "Feb", plays: 1758 },
+      { label: "Mar", plays: 1475 },
+      { label: "Apr", plays: 2251 },
+      { label: "May", plays: 1293 },
+      { label: "Jun", plays: 1390 },
+      { label: "Jul", plays: 3132 },
+      { label: "Aug", plays: 2185 },
+      { label: "Sep", plays: 1889 },
+      { label: "Oct", plays: 1880 },
+      { label: "Nov", plays: 1766 },
+      { label: "Dec", plays: 1667 }
     ],
     daily: Array.from({ length: 14 }, (_, index) => ({
       label: String(index + 1),
