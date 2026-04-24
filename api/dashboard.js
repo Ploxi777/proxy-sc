@@ -20,74 +20,8 @@ import {
 
 const DEFAULT_USER_URL = "https://soundcloud.com/ploxiii";
 
-const INCLUDE_MANUAL_ADJUSTMENTS =
-  process.env.DASHBOARD_INCLUDE_MANUAL_ADJUSTMENTS !== "false";
-
 const SINCE_YEAR = 2025;
 
-const YEARLY_TOTALS = [
-  { label: "2024", total: 12000 },
-  { label: "2025", total: 18500 },
-  { label: "2026", total: 26000 }
-];
-
-function cumulativeToGrowth(items) {
-  return items.map((item, index) => {
-    if (index === 0) {
-      return { label: item.label, plays: item.total };
-    }
-
-    const previousTotal = items[index - 1].total;
-    const diff = item.total - previousTotal;
-
-    return {
-      label: item.label,
-      plays: diff <= 0 ? item.total : diff
-    };
-  });
-}
-
-const MANUAL_ADJUSTMENTS = {
-  totals: {
-    playback_count: 0,
-    likes: 0,
-    comments: 0,
-    reposts: 0,
-    downloads: 0
-  },
-  history: {
-    yearly: cumulativeToGrowth(YEARLY_TOTALS),
-    monthly: [
-      { label: "Jan", plays: 1668 },
-      { label: "Feb", plays: 1758 },
-      { label: "Mar", plays: 1475 },
-      { label: "Apr", plays: 2251 },
-      { label: "May", plays: 1293 },
-      { label: "Jun", plays: 1390 },
-      { label: "Jul", plays: 3132 },
-      { label: "Aug", plays: 2185 },
-      { label: "Sep", plays: 1889 },
-      { label: "Oct", plays: 1880 },
-      { label: "Nov", plays: 1766 },
-      { label: "Dec", plays: 1667 }
-    ],
-    daily: Array.from({ length: 14 }, (_, index) => ({
-      label: String(index + 1),
-      plays: 2000 + index * 180
-    }))
-  }
-};
-
-function addTotals(liveTotals, manualTotals) {
-  return {
-    playback_count:
-      (liveTotals.playback_count || 0) + manualTotals.playback_count,
-    likes: (liveTotals.likes || 0) + manualTotals.likes,
-    comments: (liveTotals.comments || 0) + manualTotals.comments,
-    reposts: (liveTotals.reposts || 0) + manualTotals.reposts,
-    downloads: (liveTotals.downloads || 0) + manualTotals.downloads
-  };
-}
 
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -119,28 +53,12 @@ export default async function handler(req, res) {
 
     const normalizedTracks = items
       .map(normalizeTrack)
-      .filter(track => {
-        if (!track.created_at) return false;
-        return new Date(track.created_at).getFullYear() >= SINCE_YEAR;
-      })
       .sort(
         (a, b) =>
           (b.playback_count || 0) - (a.playback_count || 0)
       );
 
-    const liveTotals = sumTrackTotals(normalizedTracks);
-
-    const manualTotals = INCLUDE_MANUAL_ADJUSTMENTS
-      ? MANUAL_ADJUSTMENTS.totals
-      : {
-          playback_count: 0,
-          likes: 0,
-          comments: 0,
-          reposts: 0,
-          downloads: 0
-        };
-
-    const finalTotals = addTotals(liveTotals, manualTotals);
+    const finalTotals = sumTrackTotals(normalizedTracks);
 
     setCacheHeaders(res, {
       browserMaxAge: 0,
@@ -158,16 +76,14 @@ export default async function handler(req, res) {
       comments: finalTotals.comments,
       reposts: finalTotals.reposts,
       downloads: finalTotals.downloads,
-      history: INCLUDE_MANUAL_ADJUSTMENTS
-        ? MANUAL_ADJUSTMENTS.history
-        : { yearly: [], monthly: [], daily: [] },
+      history: { yearly: [], monthly: [], daily: [] },
       tracks: normalizedTracks,
       updatedAt: new Date().toISOString(),
       meta: {
         apiBaseUrl: getApiBaseUrl(),
         requestedUserUrl: userUrl,
         authMode: collectionAuthMode || authMode,
-        manualAdjustmentsApplied: INCLUDE_MANUAL_ADJUSTMENTS
+        manualAdjustmentsApplied: false
       }
     });
   } catch (error) {
