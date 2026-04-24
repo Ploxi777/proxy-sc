@@ -31,7 +31,7 @@ const YEARLY_TOTALS = [
   { label: "2023", total: 0 },
   { label: "2024", total: 147 },
   { label: "2025", total: 15880 },
-  { label: "2026", total: 7152 }
+  { label: "2026", total: 8000 }
 ];
 
 function cumulativeToGrowth(items) {
