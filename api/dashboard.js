@@ -28,10 +28,10 @@ const YEARLY_TOTALS = [
   { label: "2020", total: 0 },
   { label: "2021", total: 0 },
   { label: "2022", total: 0 },
-  { label: "2023", total: 150000 },
-  { label: "2024", total: 710000 },
-  { label: "2025", total: 1620000 },
-  { label: "2026", total: 1735576 }
+  { label: "2023", total: 0 },
+  { label: "2024", total: 147 },
+  { label: "2025", total: 15880 },
+  { label: "2026", total: 7152 }
 ];
 
 function cumulativeToGrowth(items) {
@@ -50,10 +50,10 @@ function cumulativeToGrowth(items) {
 
 const MANUAL_ADJUSTMENTS = {
   totals: {
-    playback_count: 271858,
-    likes: 2759,
-    comments: 36,
-    reposts: 118,
+    playback_count: 23179,
+    likes: 378,
+    comments: 25,
+    reposts: 35,
     downloads: 0
   },
   history: {
