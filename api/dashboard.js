@@ -28,6 +28,7 @@ const INCLUDE_MANUAL_ADJUSTMENTS =
 const SINCE_YEAR = 2025;
 
 const YEARLY_TOTALS = [
+  { label: "2024", total: 4535 },
   { label: "2025", total: 15880 },
   { label: "2026", total: 23208 }
 ];
@@ -99,7 +100,12 @@ export default async function handler(req, res) {
   if (!enforceMethod(req, res, ["GET"])) return null;
 
   try {
-    const requestedUrl = getQueryValue(req, "url", "user_url", "userUrl");
+    const requestedUrl = getQueryValue(
+      req,
+      "url",
+      "user_url",
+      "userUrl"
+    );
 
     const userUrl = resolveSoundCloudUrl(
       requestedUrl,
@@ -113,13 +119,19 @@ export default async function handler(req, res) {
     const userId = user?.id;
 
     if (!userId) {
-      throw new Error("SoundCloud resolve response did not contain a user id");
+      throw new Error(
+        "SoundCloud resolve response did not contain a user id"
+      );
     }
 
-    const collectionPath = `users/${encodeURIComponent(String(userId))}/tracks`;
+    const collectionPath = `users/${encodeURIComponent(
+      String(userId)
+    )}/tracks`;
 
-    const { items, authMode: collectionAuthMode } =
-      await fetchCollection(collectionPath);
+    const {
+      items,
+      authMode: collectionAuthMode
+    } = await fetchCollection(collectionPath);
 
     const normalizedTracks = items
       .map(normalizeTrack)
@@ -179,7 +191,8 @@ export default async function handler(req, res) {
 
     if (error?.code === "soundcloud_captcha_blocked") {
       return sendJson(res, 503, {
-        error: "SoundCloud temporarily blocked server access with captcha",
+        error:
+          "SoundCloud temporarily blocked server access with captcha",
         code: "soundcloud_captcha_blocked"
       });
     }
