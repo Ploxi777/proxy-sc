@@ -51,9 +51,9 @@ function cumulativeToGrowth(items) {
 const MANUAL_ADJUSTMENTS = {
   totals: {
     playback_count: 0,
-    likes: 378,
-    comments: 25,
-    reposts: 35,
+    likes: 0,
+    comments: 0,
+    reposts: 0,
     downloads: 0
   },
   history: {
