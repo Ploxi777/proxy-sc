@@ -17,7 +17,7 @@ import {
   sumTrackTotals
 } from "./_lib/soundcloud.js";
 
-const DEFAULT_USER_URL = process.env.SOUNDCLOUD_USER_URL?.trim() || "https://soundcloud.com/arekkuzzera";
+const DEFAULT_USER_URL = process.env.SOUNDCLOUD_USER_URL?.trim() || "https://soundcloud.com/ploxiii";
 const INCLUDE_MANUAL_ADJUSTMENTS = process.env.DASHBOARD_INCLUDE_MANUAL_ADJUSTMENTS !== "false";
 
 const YEARLY_TOTALS = [
